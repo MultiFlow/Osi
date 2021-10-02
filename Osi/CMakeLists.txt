@@ -2,53 +2,65 @@ set(NAME "OSI")
 
 # PTHREAD
 if(PTHREADS_FOUND)
-  set(${NAME}_PTHREADS "1" CACHE INTERNAL "Use pthread")
+  set(${NAME}_PTHREADS
+      "1"
+      CACHE INTERNAL "Use pthread")
 endif()
 
-set(COIN_${NAME}_CHECKLEVEL "0" CACHE INTERNAL
-  "${NAME} check level")
-set(COIN_${NAME}_VERBOSITY "0" CACHE INTERNAL
-  "${NAME} verbosity level")
+set(COIN_${NAME}_CHECKLEVEL
+    "0"
+    CACHE INTERNAL "${NAME} check level")
+set(COIN_${NAME}_VERBOSITY
+    "0"
+    CACHE INTERNAL "${NAME} verbosity level")
 configure_file(config.h.cmake.in config.h)
 configure_file(config_osi.h.cmake.in config_osi.h)
 
-set(_SRCS
-  src/Osi/OsiAuxInfo.cpp
-  src/Osi/OsiBranchingObject.cpp
-  src/Osi/OsiChooseVariable.cpp
-  src/Osi/OsiColCut.cpp
-  src/Osi/OsiCut.cpp
-  src/Osi/OsiCuts.cpp
-  src/Osi/OsiNames.cpp
-  src/Osi/OsiPresolve.cpp
-  src/Osi/OsiRowCut.cpp
-  src/Osi/OsiRowCutDebugger.cpp
-  src/Osi/OsiSolverBranch.cpp
-  src/Osi/OsiSolverInterface.cpp)
+# Osi Libary
+file(GLOB _SRCS "src/Osi/*.cpp")
+file(GLOB _HDRS "src/Osi/*.hpp")
 
-set(_HDRS
-  src/Osi/OsiConfig.h
-  src/Osi/OsiAuxInfo.hpp
-  src/Osi/OsiBranchingObject.hpp
-  src/Osi/OsiChooseVariable.hpp
-  src/Osi/OsiColCut.hpp
-  src/Osi/OsiCollections.hpp
-  src/Osi/OsiCut.hpp
-  src/Osi/OsiCuts.hpp
-  src/Osi/OsiPresolve.hpp
-  src/Osi/OsiRowCut.hpp
-  src/Osi/OsiRowCutDebugger.hpp
-  src/Osi/OsiSolverBranch.hpp
-  src/Osi/OsiSolverInterface.hpp
-  src/Osi/OsiSolverParameters.hpp)
+# CPLEX if available
+find_package(CPLEX)
+if(CPLEX_FOUND)
+  # Append OsiCplex src and heagers
+  message(STATUS "Adding OsiCplex")
+  file(GLOB _SRCS_CPLEX "src/OsiCpx/*.cpp")
+  file(GLOB _HDRS_CPLEX "src/OsiCpx/*.hpp")
+  set(_SRCS ${_SRCS} ${_SRCS_CPLEX})
+  set(_HDRS ${_HDRS} ${_HDRS_CPLEX})
+endif()
+
+# GUROBI if available
+find_package(GUROBI)
+if(GUROBI_FOUND)
+  message(STATUS "Adding OsiGrb")
+  # Append OsiGrb src and heagers
+  file(GLOB _SRCS_GUROBI "src/OsiGrb/*.cpp")
+  file(GLOB _HDRS_GUROBI "src/OsiGrb/*.hpp")
+  set(_SRCS ${_SRCS} ${_SRCS_GUROBI})
+  set(_HDRS ${_HDRS} ${_HDRS_GUROBI})
+endif()
+
+# GLPK if available
+find_package(GLPK)
+if(GLPK_FOUND)
+  message(STATUS "Adding OsiGlpk")
+  file(GLOB _SRCS_GLPK "src/OsiGlpk/*.cpp")
+  file(GLOB _HDRS_GLPK "src/OsiGlpk/*.hpp")
+  set(_SRCS ${_SRCS} ${_SRCS_GLPK})
+  set(_HDRS ${_HDRS} ${_HDRS_GLPK})
+endif()
 
 add_library(Osi ${_SRCS} ${_HDRS})
-target_include_directories(Osi PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Osi>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include/coin>)
-target_compile_definitions(Osi
+target_include_directories(
+  Osi
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Osi>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+         $<INSTALL_INTERFACE:include/coin>)
+target_compile_definitions(
+  Osi
   PUBLIC HAVE_CONFIG_H
   PRIVATE OSI_BUILD)
 if(CMAKE_VERSION VERSION_LESS "3.8.2")
@@ -57,18 +69,40 @@ if(CMAKE_VERSION VERSION_LESS "3.8.2")
 else()
   target_compile_features(Osi PUBLIC cxx_std_11)
 endif()
+
 target_link_libraries(Osi PUBLIC Coin::CoinUtils)
-set_target_properties(Osi PROPERTIES
-  PUBLIC_HEADER "${_HDRS};${CMAKE_CURRENT_BINARY_DIR}/config_osi.h"
-  VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR})
+
+# Link optional solvers
+if(CPLEX_FOUND)
+  target_include_directories(
+    Osi PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/OsiCplex>)
+  target_link_libraries(Osi PRIVATE CPLEX::CPLEX)
+endif()
+
+if(GUROBI_FOUND)
+  target_include_directories(
+    Osi PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/OsiGrb>)
+  target_link_libraries(Osi PRIVATE GUROBI::GUROBI)
+endif()
+
+if(GLPK_FOUND)
+  target_include_directories(
+    Osi PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/OsiGlpk>)
+  target_link_libraries(Osi PRIVATE GLPK::GLPK)
+endif()
+
+set_target_properties(
+  Osi
+  PROPERTIES PUBLIC_HEADER "${_HDRS};${CMAKE_CURRENT_BINARY_DIR}/config_osi.h"
+             VERSION ${PROJECT_VERSION}
+             SOVERSION ${PROJECT_VERSION_MAJOR})
 add_library(Coin::Osi ALIAS Osi)
 
 # Install
 include(GNUInstallDirs)
-install(TARGETS Osi
+install(
+  TARGETS Osi
   EXPORT ${PROJECT_NAME}Targets
   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/coin
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  )
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
