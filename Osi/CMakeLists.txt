@@ -42,9 +42,9 @@ if(GUROBI_FOUND)
   set(_HDRS ${_HDRS} ${_HDRS_GUROBI})
 endif()
 
-# GLPK if available
+# GLPK if available (note: version 4.48!)
 find_package(GLPK)
-if(GLPK_FOUND)
+if(GLPK_FOUND AND GLPK_VERSION VERSION_EQUAL "4.48")
   message(STATUS "Adding OsiGlpk")
   file(GLOB _SRCS_GLPK "src/OsiGlpk/*.cpp")
   file(GLOB _HDRS_GLPK "src/OsiGlpk/*.hpp")
